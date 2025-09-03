@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CSLAV — Statistický list trestních činů (ANZ 2026)</title>
+<style>
+  :root {
+    --primary: #2563eb;
+    --primary-light: #3b82f6;
+    --primary-dark: #1d4ed8;
+    --secondary: #10b981;
+    --background: #f8fafc;
+    --surface: #ffffff;
+    --surface-alt: #f1f5f9;
+    --border: #e2e8f0;
+    --border-focus: #3b82f6;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-light: #94a3b8;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --success: #10b981;
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  }
+
+  [data-theme="dark"] {
+    --primary: #3b82f6;
+    --primary-light: #60a5fa;
+    --primary-dark: #2563eb;
+    --secondary: #34d399;
+    --background: #0f172a;
+    --surface: #1e293b;
+    --surface-alt: #334155;
+    --border: #475569;
+    --border-focus: #60a5fa;
+    --text: #f8fafc;
+    --text-muted: #cbd5e1;
+    --text-light: #94a3b8;
+    --danger: #f87171;
+    --warning: #fbbf24;
+    --success: #34d399;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    margin: 0;
+    background: var(--background);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 1rem 1.5rem;
+  }
+
+  .header-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--primary);
+    margin: 0;
+  }
+
+  .header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    text-decoration: none;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn:hover {
+    background: var(--surface-alt);
+    border-color: var(--border-focus);
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .btn-primary:hover {
+    background: var(--primary-dark);
+  }
+
+  .btn-secondary {
+    background: var(--secondary);
+    color: white;
+    border-color: var(--secondary);
+  }
+
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid transparent;
+  }
+
+  .btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 1.5rem;
+    padding: 1.5rem;
+  }
+
+  .sidebar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    height: fit-content;
+    position: sticky;
+    top: calc(80px + 1.5rem);
+  }
+
+  .sidebar-section {
+    margin-bottom: 2rem;
+  }
+
+  .sidebar-section:last-child {
+    margin-bottom: 0;
+  }
+
+  .sidebar-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    margin: 0 0 0.75rem 0;
+  }
+
+  .sidebar-btn {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.75rem;
+    border: none;
+    background: transparent;
+    color: var(--text);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-bottom: 0.25rem;
+  }
+
+  .sidebar-btn:hover {
+    background: var(--surface-alt);
+  }
+
+  .sidebar-btn.active {
+    background: var(--primary);
+    color: white;
+  }
+
+  .main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.5rem;
+  }
+
+  .card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0;
+  }
+
+  .badge-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    background: var(--surface-alt);
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  .badge-primary {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+  }
+
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1rem;
+    align-items: end;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .form-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  .form-label.required::after {
+    content: ' *';
+    color: var(--danger);
+  }
+
+  .form-input,
+  .form-select {
+    padding: 0.75rem;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    transition: all 0.2s ease;
+  }
+
+  .form-input:focus,
+  .form-select:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+  }
+
+  .form-input:disabled,
+  .form-select:disabled {
+    background: var(--surface-alt);
+    color: var(--text-light);
+    cursor: not-allowed;
+  }
+
+  .table-container {
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    overflow: hidden;
+  }
+
+  .table-scroll {
+    max-height: 400px;
+    overflow: auto;
+  }
+
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .table th,
+  .table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .table th {
+    background: var(--surface-alt);
+    font-weight: 600;
+    color: var(--text);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .table tr:last-child td {
+    border-bottom: none;
+  }
+
+  .table tr:hover {
+    background: var(--surface-alt);
+  }
+
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    min-width: 200px;
+  }
+
+  .checkbox-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .checkbox {
+    width: 1rem;
+    height: 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    cursor: pointer;
+  }
+
+  .checkbox:checked {
+    background: var(--primary);
+    border-color: var(--primary);
+  }
+
+  .note {
+    padding: 1rem;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: 1rem;
+  }
+
+  .alert {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    margin-bottom: 1rem;
+  }
+
+  .alert-success {
+    background: rgb(34 197 94 / 0.1);
+    border: 1px solid rgb(34 197 94 / 0.2);
+    color: rgb(21 128 61);
+  }
+
+  .alert-error {
+    background: rgb(239 68 68 / 0.1);
+    border: 1px solid rgb(239 68 68 / 0.2);
+    color: rgb(153 27 27);
+  }
+
+  .output-section {
+    margin-top: 1rem;
+  }
+
+  .output-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .output-content {
+    padding: 1rem;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 0.5rem 0.5rem;
+    white-space: pre-wrap;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.75rem;
+    max-height: 300px;
+    overflow: auto;
+  }
+
+  .file-input {
+    display: none;
+  }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .stat-card {
+    padding: 1rem;
+    background: var(--surface-alt);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+  }
+
+  .stat-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+    margin-top: 0.25rem;
+  }
+
+  @media (max-width: 1024px) {
+    .container {
+      grid-template-columns: 1fr;
+      padding: 1rem;
+    }
+
+    .sidebar {
+      position: static;
+    }
+
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .header-content {
+      padding: 0.75rem 1rem;
+    }
+
+    .header-actions {
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+  }
+
+  .po-only {
+    display: none;
+  }
+</style>
+</head>
+<body>
+<header class="header">
+  <div class="header-content">
+    <h1 class="header-title">CSLAV — Statistický list trestních činů (ANZ 2026)</h1>
+    <div class="header-actions">
+      <button id="themeBtn" class="btn btn-ghost" title="Přepnout režim">🌙 Tmavý režim</button>
+      <button id="validateBtn" class="btn">✅ Zkontrolovat</button>
+      <button id="exportBtn" class="btn btn-primary">📥 Exportovat JSON</button>
+    </div>
+  </div>
+</header>
+
+<div class="container">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h3 class="sidebar-title">Výběr formuláře</h3>
+      <button class="sidebar-btn active" data-form="fo">S SL T — fyzické osoby (FO)</button>
+      <button class="sidebar-btn" data-form="po">S SL TPO — právnické osoby (PO)</button>
+    </div>
+
+    <div class="sidebar-section">
+      <h3 class="sidebar-title">Správa číselníků</h3>
+      <button id="btnLoadCB" class="sidebar-btn">📥 Nahrát číselníky (JSON)</button>
+      <input class="file-input" id="cbFile" type="file" accept="application/json" />
+      <button id="btnTemplate" class="sidebar-btn">📄 Stáhnout šablonu</button>
+      <button id="btnExportCB" class="sidebar-btn">💾 Exportovat číselníky</button>
+      <div class="note">
+        Načtené číselníky se uloží do <code>localStorage</code> a použijí po načtení stránky.
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3 class="sidebar-title">Rychlé akce</h3>
+      <button id="addIndication" class="sidebar-btn">+ Přidat indikaci</button>
+      <button id="addVictim" class="sidebar-btn">+ Přidat oběť</button>
+    </div>
+  </aside>
+
+  <main class="main-content">
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title">Základní údaje</h2>
+        <div class="badge-group">
+          <span class="badge badge-primary" id="formLabel">FO</span>
+          <span class="badge">Platnost od: 1. 1. 2026</span>
+          <span class="badge" id="cbInfo">Číselníky: výchozí</span>
+        </div>
+      </div>
+
+      <div class="form-grid">
+        <div style="grid-column: span 3;">
+          <div class="form-group">
+            <label for="form_5a" class="form-label required">5a — Skupinová věc</label>
+            <select id="form_5a" class="form-select">
+              <option value="">— vyberte —</option>
+              <option value="1">1 — Ano</option>
+              <option value="2">2 — Ne</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="grid-column: span 3;">
+          <div class="form-group">
+            <label for="form_5b" class="form-label">5b — Hlavní statistický list</label>
+            <select id="form_5b" class="form-select">
+              <option value="">— vyberte —</option>
+              <option value="1">1 — Ano (hlavní SL)</option>
+              <option value="2">2 — Ne</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="grid-column: span 3;">
+          <div class="form-group">
+            <label for="narok53" class="form-label">53 — Výše přiznaného nároku (Kč)</label>
+            <input id="narok53" type="number" min="0" step="1" placeholder="0" class="form-input" />
+          </div>
+        </div>
+
+        <div class="po-only" style="grid-column: span 3;">
+          <div class="form-group">
+            <label for="po_25a" class="form-label required">25a — Řízení s fyzickou osobou</label>
+            <select id="po_25a" class="form-select">
+              <option value="">— vyberte —</option>
+              <option value="1">1 — Ano</option>
+              <option value="2">2 — Ne</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>Poznámka:</strong> Položka 53 musí být vyplněna, pokud je v indikacích alespoň jeden řádek s 
+        <code>IN ∈ {1,4,6,7,12,13}</code> a „Nárok poškozeného přiznán" = <code>1</code>, 
+        a to jen v hlavním SL (skup.) nebo mimo skupinu.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title">Tabulka indikací (50 / 44)</h2>
+        <button class="btn btn-secondary" id="btnAddIndication">+ Přidat indikaci</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-number" id="indicationsCount">0</div>
+          <div class="stat-label">Celkem indikací</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="victimsLinked">0</div>
+          <div class="stat-label">Napojených obětí</div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <div class="table-scroll">
+          <table class="table" id="indicationsTbl">
+            <thead>
+              <tr>
+                <th style="width: 60px;">#</th>
+                <th style="width: 150px;">Paragraf TZ</th>
+                <th style="width: 120px;">IN (způsob PM)</th>
+                <th style="width: 140px;">Nárok poškozeného</th>
+                <th style="width: 100px;">Oběť číslo</th>
+                <th style="width: 80px;">Počet obětí</th>
+                <th style="min-width: 250px;">Mapovat oběti</th>
+                <th style="width: 60px;"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>Poznámka:</strong> „Oběť číslo" a „Počet obětí" se přepočítá automaticky z vazeb indikace↔oběť.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title">Tabulka obětí trestných činů (54 / 48)</h2>
+        <button class="btn btn-secondary" id="btnAddVictim">+ Přidat oběť</button>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-number" id="victimsCount">0</div>
+          <div class="stat-label">Celkem obětí</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-number" id="domesticViolence">0</div>
+          <div class="stat-label">Domácí násilí</div>
+        </div>
+      </div>
+
+      <div class="table-container">
+        <div class="table-scroll">
+          <table class="table" id="victimsTbl">
+            <thead>
+              <tr>
+                <th style="width: 60px;">#</th>
+                <th style="width: 120px;">Obětí je*</th>
+                <th style="width: 120px;">Státní příslušnost*</th>
+                <th style="width: 120px;">Země narození*</th>
+                <th style="width: 100px;">Domácí násilí*</th>
+                <th style="width: 100px;">Druh DN (1)</th>
+                <th style="width: 100px;">Druh DN (2)</th>
+                <th style="width: 140px;">Pachatelem je (1)</th>
+                <th style="width: 140px;">(2)</th>
+                <th style="width: 140px;">(3)</th>
+                <th style="width: 140px;">(4)</th>
+                <th style="width: 140px;">(5)</th>
+                <th style="width: 80px;">Femicida</th>
+                <th style="width: 120px;">Nenáv. pohnutka</th>
+                <th style="width: 120px;">Intoxikace</th>
+                <th style="width: 60px;"></th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="note">
+        <strong>Tip:</strong> Nejprve přidejte oběť, pak ji v indikacích propojíte zaškrtávátky.
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title">Výstupy a kontrola</h2>
+      </div>
+
+      <div class="output-section">
+        <div class="output-toggle" onclick="toggleOutput('errors')">
+          <span>Chyby kontrol</span>
+          <span>▼</span>
+        </div>
+        <div id="errorsContent" class="output-content" style="display: block;"></div>
+      </div>
+
+      <div class="output-section">
+        <div class="output-toggle" onclick="toggleOutput('json')">
+          <span>JSON — 4 struktury (SL, Tabulka indikací, Tabulka obětí, Vazební tabulka)</span>
+          <span>▼</span>
+        </div>
+        <div id="jsonContent" class="output-content" style="display: none;"></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+(function(){
+  // === ČÍSELNÍKY ============================================================
+  const DEFAULT_CB = {
+    meta: { name:'default', version:'0.1', source:'embedded' },
+    obetiJe: [
+      {id:'11', label:'11 — žena'},
+      {id:'28', label:'28 — muž'},
+      {id:'40', label:'40 — dítě žena'},
+      {id:'41', label:'41 — dítě muž'},
+      {id:'42', label:'42 — senior žena'},
+      {id:'43', label:'43 — senior muž'},
+      {id:'44', label:'44 — žena mladistvá'},
+      {id:'45', label:'45 — muž mladistvý'}
+    ],
+    pachatelemJe: [
+      {id:'101', label:'101 — současný intimní partner'},
+      {id:'102', label:'102 — bývalý intimní partner'},
+      {id:'200', label:'200 — přítel/známý'},
+      {id:'210', label:'210 — kolega (prac./obchodní vztah)'},
+      {id:'230', label:'230 — jiný'},
+      {id:'300', label:'300 — pachatel obětí neznámý'}
+    ],
+    druhDN: [
+      {id:'1', label:'1 — fyzické'},
+      {id:'2', label:'2 — psychické'},
+      {id:'3', label:'3 — ekonomické'},
+      {id:'4', label:'4 — sexuální'},
+      {id:'5', label:'5 — kontrolující'},
+      {id:'6', label:'6 — kybernetické'}
+    ],
+    in: [
+      {id:'1', label:'1 — odsouzen'},
+      {id:'4', label:'4 — zastaveno'},
+      {id:'6', label:'6 — zproštěn'},
+      {id:'7', label:'7 — schválené narovnání'},
+      {id:'12', label:'12 — společný trest (§37a/§45)'},
+      {id:'13', label:'13 — souhrný trest'}
+    ],
+    nenavist: [
+      {id:'1', label:'1 — rasová/národnostní/etnická/…'},
+      {id:'2', label:'2 — sexuální/genderová identita, LGBTQIA+'},
+      {id:'3', label:'3 — politická příslušnost'},
+      {id:'4', label:'4 — třídní příslušnost'},
+      {id:'5', label:'5 — náboženské vyznání'},
+      {id:'9', label:'9 — jiná nenávistná pohnutka'}
+    ],
+    intox: [
+      {id:'1', label:'1 — alkohol'},
+      {id:'2', label:'2 — omamné či psychotropní látky'},
+      {id:'3', label:'3 — léky či jiná látka'}
+    ],
+    staty: [
+      {id:'203', label:'203 — Česká republika'},
+      {id:'276', label:'276 — Německo'},
+      {id:'840', label:'840 — USA'}
+    ],
+    paragrafyTax: [
+      '§ 140','§ 141/2(c)','§ 142','§ 145/2(c)','§ 145/3','§ 146/2(b)','§ 146a/4(c)','§ 149/3(b)','§ 164/3(a)','§ 164/4(a)','§ 166/3(c)','§ 166/4(c)','§ 168/1','§ 232a/1','§ 198','§ 199','§ 220','§ 219/2(e)','§ 377/2'
+    ]
+  };
+
+  function loadCBFromStorage(){
+    try { 
+      const raw = localStorage.getItem('cslav_cb_v1'); 
+      if(!raw) return null; 
+      return JSON.parse(raw);
+    } catch(e){ 
+      return null; 
+    }
+  }
+  
+  function saveCBToStorage(cb){ 
+    localStorage.setItem('cslav_cb_v1', JSON.stringify(cb)); 
+  }
+
+  let CB = loadCBFromStorage() || DEFAULT_CB;
+
+  // === APLIKAČNÍ STAV =======================================================
+  const state = {
+    form:'fo', 
+    fiveA:'', 
+    fiveB:'', 
+    narok53:'', 
+    po25a:'',
+    indications: [], // {id, paragraf, in, narok, victims:Set(ids)}
+    victims: []      // {id, obetiJe, stat, zeme, dn, dn1, dn2, pj:[...5], femicida, nenavist, intox}
+  };
+
+  // === POMOCNÉ FUNKCE =======================================================
+  const el = id => document.getElementById(id);
+  const qsa = (sel,root=document) => Array.from(root.querySelectorAll(sel));
+  const opt = (id,label,val) => `<option value="${id}" ${id==val?'selected':''}>${label}</option>`;
+  const opts = (arr,val) => arr.map(x=>opt(x.id,x.label,val)).join('');
+
+  function applyTheme(t){ 
+    document.documentElement.setAttribute('data-theme', t==='light'?'light':'dark'); 
+    localStorage.setItem('theme',t); 
+    el('themeBtn').textContent = t==='light'?'☀️ Světlý režim':'🌙 Tmavý režim'; 
+  }
+  
+  applyTheme(localStorage.getItem('theme')||'light');
+  el('themeBtn').
