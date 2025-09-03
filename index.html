@@ -793,7 +793,428 @@
   function applyTheme(t){ 
     document.documentElement.setAttribute('data-theme', t==='light'?'light':'dark'); 
     localStorage.setItem('theme',t); 
-    el('themeBtn').textContent = t==='light'?'☀️ Světlý režim':'🌙 Tmavý režim'; 
+    el('themeBtn').onclick = ()=> applyTheme((localStorage.getItem('theme')||'light')==='light'?'dark':'light');
+
+  function cbInfoText(){ 
+    const m=CB.meta||{}; 
+    return `Číselníky: ${m.name||'n/a'} v${m.version||'n/a'}`; 
+  }
+
+  function toggleOutput(type) {
+    const content = el(type + 'Content');
+    const toggle = content.previousElementSibling.querySelector('span:last-child');
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      toggle.textContent = '▲';
+    } else {
+      content.style.display = 'none';
+      toggle.textContent = '▼';
+    }
+  }
+
+  // === UI HANDLERY ==========================================================
+  qsa('.sidebar-btn[data-form]').forEach(btn=>{
+    btn.onclick = ()=>{ 
+      qsa('.sidebar-btn[data-form]').forEach(b=>b.classList.remove('active')); 
+      btn.classList.add('active'); 
+      state.form=btn.dataset.form; 
+      el('formLabel').textContent= state.form==='fo'?'FO':'PO'; 
+      qsa('.po-only').forEach(x=>x.style.display = state.form==='po'?'block':'none'); 
+      render(); 
+    };
+  });
+
+  el('form_5a').onchange = e=>{ state.fiveA = e.target.value; render(); };
+  el('form_5b').onchange = e=>{ state.fiveB = e.target.value; render(); };
+  el('narok53').oninput = e=> state.narok53 = e.target.value;
+  el('po_25a').onchange = e=> state.po25a = e.target.value;
+
+  // Add rows
+  function addIndication(){ 
+    const id = state.indications.length? Math.max(...state.indications.map(r=>r.id))+1 : 1; 
+    state.indications.push({id,paragraf:'',in:'',narok:'',victims:new Set()}); 
+    render(); 
+  }
+  
+  function addVictim(){ 
+    const id = state.victims.length? Math.max(...state.victims.map(r=>r.id))+1 : 1; 
+    state.victims.push({id,obetiJe:'',stat:CB.staty?.[0]?.id||'',zeme:CB.staty?.[0]?.id||'',dn:'',dn1:'',dn2:'',pj:['','','','',''],femicida:'',nenavist:'',intox:''}); 
+    render(); 
+  }
+  
+  el('btnAddIndication').onclick = addIndication; 
+  el('addIndication').onclick = addIndication;
+  el('btnAddVictim').onclick = addVictim; 
+  el('addVictim').onclick = addVictim;
+
+  // Číselníky — nahrání/export
+  el('btnLoadCB').onclick = ()=> el('cbFile').click();
+  el('cbFile').onchange = async (e)=>{
+    const f = e.target.files?.[0]; 
+    if(!f) return; 
+    try{
+      const txt = await f.text(); 
+      const json = JSON.parse(txt);
+      // Jednoduchá validace struktur
+      const needed = ['obetiJe','pachatelemJe','druhDN','in','nenavist','intox','staty','paragrafyTax'];
+      const miss = needed.filter(k=>!(k in json));
+      if(miss.length){ 
+        alert('V JSON chybí tyto sekce číselníků: '+miss.join(', ')); 
+        return; 
+      }
+      CB = json; 
+      saveCBToStorage(CB); 
+      render(); 
+      alert('Číselníky nahrány.');
+    }catch(err){ 
+      alert('Nepodařilo se načíst JSON: '+err); 
+    }
+    e.target.value = '';
+  };
+  
+  el('btnTemplate').onclick = ()=>{
+    const tpl = {
+      meta:{ name:'produkční-číselníky', version:'2026.01', source:'ISAS/CSLAV export' },
+      obetiJe:[ {id:'11',label:'11 — žena'}, {id:'28',label:'28 — muž'} ],
+      pachatelemJe:[ {id:'101',label:'101 — současný intimní partner'} ],
+      druhDN:[ {id:'1',label:'1 — fyzické'} ],
+      in:[ {id:'1',label:'1 — odsouzen'} ],
+      nenavist:[ {id:'2',label:'2 — sexuální/genderová identita'} ],
+      intox:[ {id:'1',label:'1 — alkohol'} ],
+      staty:[ {id:'203',label:'203 — Česká republika'} ],
+      paragrafyTax:[ '§ 140','§ 198' ]
+    };
+    const blob = new Blob([JSON.stringify(tpl,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); 
+    a.href=URL.createObjectURL(blob); 
+    a.download='cslav_ciselniky_sablona.json'; 
+    a.click();
+  };
+  
+  el('btnExportCB').onclick = ()=>{
+    const blob = new Blob([JSON.stringify(CB,null,2)],{type:'application/json'});
+    const a=document.createElement('a'); 
+    a.href=URL.createObjectURL(blob); 
+    a.download=`cslav_ciselniky_${(CB.meta?.name||'curr')}.json`; 
+    a.click();
+  };
+
+  // === Vykreslení tabulek ===================================================
+  function updateStats() {
+    el('indicationsCount').textContent = state.indications.length;
+    el('victimsCount').textContent = state.victims.length;
+    
+    const linkedVictims = new Set();
+    state.indications.forEach(ind => {
+      ind.victims.forEach(vid => linkedVictims.add(vid));
+    });
+    el('victimsLinked').textContent = linkedVictims.size;
+    
+    const domesticCount = state.victims.filter(v => v.dn === '1').length;
+    el('domesticViolence').textContent = domesticCount;
+  }
+
+  function render(){
+    el('cbInfo').textContent = cbInfoText();
+    updateStats();
+
+    // Indikace
+    const tb = document.querySelector('#indicationsTbl tbody'); 
+    tb.innerHTML='';
+    state.indications.forEach(row=>{
+      const mapCell = `<div class="checkbox-group">${state.victims.map(v=>{
+        const chk = row.victims.has(v.id)?'checked':'';
+        return `<div class="checkbox-item">
+          <input type='checkbox' class="checkbox" data-bind='map' data-ind='${row.id}' data-victim='${v.id}' ${chk}/>
+          <span>Oběť ${v.id}</span>
+        </div>`; 
+      }).join('')}</div>`;
+      
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${row.id}</td>
+        <td>
+          <select class="form-select" data-bind='paragraf' data-id='${row.id}'>
+            <option value=''>— vyberte —</option>
+            ${CB.paragrafyTax.map(p=>`<option value='${p}' ${row.paragraf===p?'selected':''}>${p}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <select class="form-select" data-bind='in' data-id='${row.id}'>
+            <option value=''>—</option>
+            ${opts(CB.in, row.in)}
+          </select>
+        </td>
+        <td>
+          <select class="form-select" data-bind='narok' data-id='${row.id}'>
+            <option value=''>—</option>
+            <option value='1' ${row.narok==='1'?'selected':''}>1 — vyhověno</option>
+            <option value='2' ${row.narok==='2'?'selected':''}>2 — nepřiznán</option>
+            <option value='3' ${row.narok==='3'?'selected':''}>3 — neuplatněn</option>
+          </select>
+        </td>
+        <td>${Array.from(row.victims).sort((a,b)=>a-b).join(',')}</td>
+        <td>${Array.from(row.victims).length}</td>
+        <td>${mapCell}</td>
+        <td><button class='btn btn-small' data-bind='delInd' data-id='${row.id}' title='Smazat'>🗑️</button></td>`;
+      tb.appendChild(tr);
+    });
+
+    // Oběti
+    const tv = document.querySelector('#victimsTbl tbody'); 
+    tv.innerHTML='';
+    const isGroup = state.fiveA==='1'; 
+    const isMain = state.fiveB==='1';
+    const victimsDisabled = (isGroup && !isMain);
+
+    state.victims.forEach(v=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${v.id}</td>
+        <td><select class="form-select" data-bind='v_obetiJe' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.obetiJe, v.obetiJe)}</select></td>
+        <td><select class="form-select" data-bind='v_stat' data-id='${v.id}' ${victimsDisabled?'disabled':''}>${opts(CB.staty, v.stat)}</select></td>
+        <td><select class="form-select" data-bind='v_zeme' data-id='${v.id}' ${victimsDisabled?'disabled':''}>${opts(CB.staty, v.zeme)}</select></td>
+        <td><select class="form-select" data-bind='v_dn' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option><option value='1' ${v.dn==='1'?'selected':''}>1 — Ano</option><option value='2' ${v.dn==='2'?'selected':''}>2 — Ne</option></select></td>
+        <td><select class="form-select" data-bind='v_dn1' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.druhDN, v.dn1)}</select></td>
+        <td><select class="form-select" data-bind='v_dn2' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.druhDN, v.dn2)}</select></td>
+        <td><select class="form-select" data-bind='v_pj' data-idx='0' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.pachatelemJe, v.pj[0])}</select></td>
+        <td><select class="form-select" data-bind='v_pj' data-idx='1' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.pachatelemJe, v.pj[1])}</select></td>
+        <td><select class="form-select" data-bind='v_pj' data-idx='2' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.pachatelemJe, v.pj[2])}</select></td>
+        <td><select class="form-select" data-bind='v_pj' data-idx='3' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.pachatelemJe, v.pj[3])}</select></td>
+        <td><select class="form-select" data-bind='v_pj' data-idx='4' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.pachatelemJe, v.pj[4])}</select></td>
+        <td><select class="form-select" data-bind='v_fem' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option><option value='1' ${v.femicida==='1'?'selected':''}>1 — ano</option><option value='2' ${v.femicida==='2'?'selected':''}>2 — ne</option></select></td>
+        <td><select class="form-select" data-bind='v_nen' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.nenavist, v.nenavist)}</select></td>
+        <td><select class="form-select" data-bind='v_intox' data-id='${v.id}' ${victimsDisabled?'disabled':''}><option value=''>—</option>${opts(CB.intox, v.intox)}</select></td>
+        <td><button class='btn btn-small' data-bind='delVictim' data-id='${v.id}' title='Smazat'>🗑️</button></td>`;
+      tv.appendChild(tr);
+    });
+
+    // Bind events
+    qsa('[data-bind]').forEach(ctrl=>{ 
+      ctrl.onchange = ()=>{
+        const b = ctrl.getAttribute('data-bind');
+        if(b==='paragraf'){ 
+          const id=+ctrl.getAttribute('data-id'); 
+          const r=state.indications.find(x=>x.id===id); 
+          r.paragraf=ctrl.value; 
+        }
+        else if(b==='in'){ 
+          const id=+ctrl.getAttribute('data-id'); 
+          const r=state.indications.find(x=>x.id===id); 
+          r.in=ctrl.value; 
+        }
+        else if(b==='narok'){ 
+          const id=+ctrl.getAttribute('data-id'); 
+          const r=state.indications.find(x=>x.id===id); 
+          r.narok=ctrl.value; 
+        }
+        else if(b==='map'){ 
+          const ind=+ctrl.getAttribute('data-ind'); 
+          const vid=+ctrl.getAttribute('data-victim'); 
+          const r=state.indications.find(x=>x.id===ind); 
+          if(ctrl.checked) r.victims.add(vid); 
+          else r.victims.delete(vid); 
+          render(); 
+        }
+        else if(b==='delInd'){ 
+          const id=+ctrl.getAttribute('data-id'); 
+          state.indications = state.indications.filter(x=>x.id!==id); 
+          render(); 
+        }
+        else if(b==='delVictim'){ 
+          const id=+ctrl.getAttribute('data-id'); 
+          state.victims = state.victims.filter(x=>x.id!==id); 
+          state.indications.forEach(r=>r.victims.delete(id)); 
+          render(); 
+        }
+        else if(b.startsWith('v_')){
+          const id=+ctrl.getAttribute('data-id'); 
+          const v=state.victims.find(x=>x.id===id);
+          if(b==='v_obetiJe') v.obetiJe=ctrl.value;
+          if(b==='v_stat') v.stat=ctrl.value;
+          if(b==='v_zeme') v.zeme=ctrl.value;
+          if(b==='v_dn') v.dn=ctrl.value;
+          if(b==='v_dn1') v.dn1=ctrl.value;
+          if(b==='v_dn2') v.dn2=ctrl.value;
+          if(b==='v_fem') v.femicida=ctrl.value;
+          if(b==='v_nen') v.nenavist=ctrl.value;
+          if(b==='v_intox') v.intox=ctrl.value;
+        }
+        if(b==='v_pj'){ 
+          const id=+ctrl.getAttribute('data-id'); 
+          const v=state.victims.find(x=>x.id===id); 
+          const idx=+ctrl.getAttribute('data-idx'); 
+          v.pj[idx]=ctrl.value; 
+        }
+        updateStats();
+      }; 
+    });
+  }
+
+  // === Validace =============================================================
+  function validate(){
+    const errs = [];
+    const isGroup = state.fiveA==='1'; 
+    const isMain = state.fiveB==='1';
+
+    // 5a povinně
+    if(!state.fiveA) errs.push('Položka 5a (Skupinová věc) je povinná.');
+    if(state.fiveA==='1' && !state.fiveB) errs.push('Je-li 5a=1 (skupinová věc), pak 5b (Hlavní SL) musí být vyplněno.');
+    if(state.fiveA==='2' && state.fiveB) errs.push('Je-li 5a=2 (neskup.), pak 5b nesmí být vyplněno.');
+
+    // Číselníkové kontroly
+    const inSet = new Set(CB.in.map(x=>x.id));
+    const obetiSet = new Set(CB.obetiJe.map(x=>x.id));
+    const statSet = new Set(CB.staty.map(x=>x.id));
+    const dnSet = new Set(CB.druhDN.map(x=>x.id));
+    const pjSet = new Set(CB.pachatelemJe.map(x=>x.id));
+    const nenSet = new Set(CB.nenavist.map(x=>x.id));
+    const intSet = new Set(CB.intox.map(x=>x.id));
+    const taxSet = new Set(CB.paragrafyTax);
+
+    state.indications.forEach(r=>{
+      if(r.in && !inSet.has(r.in)) errs.push(`Indikace ${r.id}: hodnota IN="${r.in}" není v číselníku.`);
+      if(r.paragraf && !taxSet.has(r.paragraf)) errs.push(`Indikace ${r.id}: paragraf "${r.paragraf}" není v načteném seznamu taxativních paragrafů.`);
+    });
+
+    if(isGroup && !isMain && state.victims.length>0) errs.push('U skupinové věci lze Tabulku obětí vyplnit pouze v hlavním SL (5b=1).');
+
+    state.victims.forEach(v=>{
+      if(!v.obetiJe) errs.push(`Oběť ${v.id}: „Obětí je" je povinné.`);
+      if(!v.stat) errs.push(`Oběť ${v.id}: „Státní příslušnost oběti" je povinná.`);
+      if(!v.zeme) errs.push(`Oběť ${v.id}: „Země narození oběti" je povinná.`);
+      if(!v.dn) errs.push(`Oběť ${v.id}: „Domácí násilí" je povinné.`);
+
+      if(v.obetiJe && !obetiSet.has(v.obetiJe)) errs.push(`Oběť ${v.id}: kód „Obětí je = ${v.obetiJe}" není v číselníku.`);
+      if(v.stat && !statSet.has(v.stat)) errs.push(`Oběť ${v.id}: kód státní příslušnosti „${v.stat}" není v číselníku.`);
+      if(v.zeme && !statSet.has(v.zeme)) errs.push(`Oběť ${v.id}: kód země narození „${v.zeme}" není v číselníku.`);
+      if(v.dn1 && !dnSet.has(v.dn1)) errs.push(`Oběť ${v.id}: „Druh DN (1) = ${v.dn1}" není v číselníku.`);
+      if(v.dn2 && !dnSet.has(v.dn2)) errs.push(`Oběť ${v.id}: „Druh DN (2) = ${v.dn2}" není v číselníku.`);
+      v.pj.forEach((p,ix)=>{ 
+        if(p && !pjSet.has(p)) errs.push(`Oběť ${v.id}: „Pachatelem je (${ix+1}) = ${p}" není v číselníku.`);
+      });
+      if(v.nenavist && !nenSet.has(v.nenavist)) errs.push(`Oběť ${v.id}: „Nenávistná pohnutka = ${v.nenavist}" není v číselníku.`);
+      if(v.intox && !intSet.has(v.intox)) errs.push(`Oběť ${v.id}: „Intoxikace = ${v.intox}" není v číselníku.`);
+
+      if(v.dn==='1'){
+        if(!v.dn1 && !v.dn2) errs.push(`Oběť ${v.id}: při DN=1 zadejte alespoň jeden „Druh DN"`);
+        const pjCount = v.pj.filter(Boolean).length; 
+        if(pjCount===0) errs.push(`Oběť ${v.id}: při DN=1 je povinné zadat „Pachatelem je" (1—5 kódů)`);
+      }
+      if(v.dn==='2'){
+        if(v.dn1||v.dn2||v.pj.some(Boolean)) errs.push(`Oběť ${v.id}: při DN=2 nesmí být vyplněn „Druh DN" ani „Pachatelem je".`);
+      }
+
+      // Nepovolené kombinace
+      if((v.obetiJe==='40'||v.obetiJe==='41')){
+        if(v.pj.includes('200')||v.pj.includes('210')) errs.push(`Oběť ${v.id}: pro dítě (40/41) nesmí být „pachatelem je" 200/210.`);
+      }
+      const onlyIntimate = v.pj.filter(x=>x==='101'||x==='102').length>0 && v.pj.filter(Boolean).length===1;
+      if(onlyIntimate && (v.obetiJe==='40'||v.obetiJe==='41')) errs.push(`Oběť ${v.id}: pokud jediným pachatelem je 101/102, obětí nesmí být dítě (40/41), a naopak.`);
+    });
+
+    // Femicida pravidlo
+    const femTrigger = state.indications.some(r=> r.paragraf.startsWith('§ 140') || r.paragraf.startsWith('§ 145/3'));
+    if(femTrigger){
+      state.victims.forEach(v=>{
+        if(['11','40','42','44'].includes(v.obetiJe)){
+          if(v.femicida!=='1') errs.push(`Oběť ${v.id}: při §140 nebo §145/3 a ženské oběti musí být Femicida=1.`);
+          if(v.femicida==='1' && v.nenavist!=='2') errs.push(`Oběť ${v.id}: pokud Femicida=1, musí být „Nenávistná pohnutka" = 2.`);
+        }
+      });
+    }
+
+    // Povinnost obětí pro taxativní paragrafy
+    state.indications.filter(r=>CB.paragrafyTax.includes(r.paragraf)).forEach(r=>{
+      if(r.victims.size===0) errs.push(`Indikace ${r.id}: pro paragraf ${r.paragraf} musí být navázána alespoň 1 oběť.`);
+    });
+
+    // Nárok 53
+    const anyReqNarok = state.indications.some(r=> ['1','4','6','7','12','13'].includes(r.in) && r.narok==='1');
+    if(anyReqNarok){ 
+      const okScope = (!isGroup) || (isGroup && isMain); 
+      if(!okScope) errs.push('Položka 53 (Výše přiznaného nároku) je povolena jen v hlavním SL ve skupinové věci.'); 
+      if(!state.narok53 || +state.narok53<=0) errs.push('Je-li „Nárok poškozeného přiznán"=1 (a IN∈{1,4,6,7,12,13}), musí být položka 53 vyplněna (>0).'); 
+    }
+
+    const errorsEl = el('errorsContent');
+    if(errs.length === 0) {
+      errorsEl.innerHTML = '<div class="alert alert-success">✅ Žádné chyby nalezeny.</div>';
+    } else {
+      errorsEl.innerHTML = '<div class="alert alert-error">• ' + errs.join('\n• ') + '</div>';
+    }
+    
+    return errs;
+  }
+
+  // === Export JSON ==========================================================
+  function exportJSON(){
+    const SL = { 
+      typ: state.form==='fo'?'S SL T (FO)':'S SL TPO (PO)', 
+      p5a: state.fiveA||null, 
+      p5b: state.fiveB||null, 
+      narok53: state.narok53?Number(state.narok53):null, 
+      po25a: state.form==='po'?(state.po25a||null):null, 
+      codebooks: (CB.meta||{}).name||'n/a', 
+      codebooksVersion: (CB.meta||{}).version||'n/a' 
+    };
+    
+    const VICT = state.victims.map(v=>({ 
+      id:v.id, 
+      obeti_je:v.obetiJe||null, 
+      stat_prisl:v.stat||null, 
+      zeme_nar:v.zeme||null, 
+      domaci_nasili:v.dn||null, 
+      druh_dn1:v.dn1||null, 
+      druh_dn2:v.dn2||null, 
+      pachatelem_je:v.pj.filter(Boolean), 
+      femicida:v.femicida||null, 
+      nenavistna_pohnutka:v.nenavist||null, 
+      intoxikace:v.intox||null 
+    }));
+    
+    const IND = state.indications.map(r=>({ 
+      id:r.id, 
+      paragraf:r.paragraf||null, 
+      in:r.in||null, 
+      narok:r.narok||null, 
+      obet_cislo:Array.from(r.victims).sort((a,b)=>a-b).join(','), 
+      pocet_obeti:Array.from(r.victims).length 
+    }));
+    
+    const REL = []; 
+    state.indications.forEach(r=> 
+      Array.from(r.victims).forEach(vid=> 
+        REL.push({ind_id:r.id, obet_id:vid})
+      ) 
+    );
+    
+    const out = { SL, IND, VICT, REL };
+    el('jsonContent').textContent = JSON.stringify(out,null,2);
+    
+    const blob = new Blob([JSON.stringify(out,null,2)],{type:'application/json'}); 
+    const a=document.createElement('a'); 
+    a.href=URL.createObjectURL(blob); 
+    a.download='cslav_prototyp_export.json'; 
+    a.click();
+  }
+
+  el('validateBtn').onclick = validate;
+  el('exportBtn').onclick = exportJSON;
+
+  // Initialize
+  addIndication(); 
+  addVictim();
+  el('cbInfo').textContent = cbInfoText();
+  render();
+  validate();
+
+  // Make functions global for onclick handlers
+  window.toggleOutput = toggleOutput;
+})();
+</script>
+</body>
+</html>textContent = t==='light'?'☀️ Světlý režim':'🌙 Tmavý režim'; 
   }
   
   applyTheme(localStorage.getItem('theme')||'light');
